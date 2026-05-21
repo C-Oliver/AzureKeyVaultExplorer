@@ -558,7 +558,7 @@ namespace Microsoft.Vault.Explorer
             {
                 using (var op = NewUxOperation(uxButtonCopyLink, uxMenuItemCopyLink))
                 {
-                    Utils.ClipboardSetHyperlink(item.Link, item.Name);
+                    Clipboard.SetText(item.Link);
                 }
             }
         }
