@@ -10,8 +10,7 @@
     <ImplicitUsings>disable</ImplicitUsings>
     <!-- Suppress noisy nullable and obsolete warnings inherited from pre-.NET-10 code -->
     <NoWarn>CS8600;CS8601;CS8602;CS8603;CS8604;CS8618;CS8622;CS8625;CS8629;CS8765;CS8767;CS8612;CS0108;CS0219;CS0618;CS0672;SYSLIB0057;WFDEV004;NU1510</NoWarn>
-    <PlatformTarget>x64</PlatformTarget>
-    <PlatformTarget Condition="'$(BuildingInsideVisualStudio)' != ''">AnyCPU</PlatformTarget>
+    <PlatformTarget>AnyCPU</PlatformTarget>
     <Platforms>x64;AnyCPU</Platforms>
     <GenerateAssemblyInfo>true</GenerateAssemblyInfo>
     <Version>2.0.0</Version>
