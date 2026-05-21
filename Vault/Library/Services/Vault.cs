@@ -199,8 +199,16 @@ namespace Microsoft.Vault.Library
                 : new Uri($"https://{vaultName}.{Consts.VaultDnsSuffix}/");
         }
 
+        // Cache credential per vault to avoid repeated sign-in prompts
+        private readonly Dictionary<string, Azure.Core.TokenCredential> _credentialCache = new(StringComparer.OrdinalIgnoreCase);
+
         private Azure.Core.TokenCredential GetCredential(VaultAccessTypeEnum accessType, string vaultName)
         {
+            if (_credentialCache.TryGetValue(vaultName, out var cached))
+                return cached;
+
+            Azure.Core.TokenCredential credential;
+
             // Use configured credential from VaultsConfig if available
             if (VaultsConfig.ContainsKey(vaultName))
             {
@@ -208,15 +216,24 @@ namespace Microsoft.Vault.Library
                 var accessList = accessType == VaultAccessTypeEnum.ReadOnly ? accessTypes.ReadOnly : accessTypes.ReadWrite;
                 if (accessList != null && accessList.Length > 0)
                 {
-                    // Sort by order (cert=0, secret=1, interactive=2) and try the first one
                     var access = accessList.OrderBy(a => a.Order).First();
-                    var credential = access.AcquireToken(null);
-                    if (credential != null)
-                        return credential;
+                    var configured = access.AcquireToken(null);
+                    if (configured != null)
+                    {
+                        _credentialCache[vaultName] = configured;
+                        return configured;
+                    }
                 }
             }
-            // Fall back to interactive browser credential (matches original behavior)
-            return new InteractiveBrowserCredential();
+
+            // Fall back to interactive browser credential with token cache persistence
+            credential = new InteractiveBrowserCredential(
+                new InteractiveBrowserCredentialOptions
+                {
+                    TokenCachePersistenceOptions = new TokenCachePersistenceOptions()
+                });
+            _credentialCache[vaultName] = credential;
+            return credential;
         }
 
         private SecretClient CreateKeyVaultClientEx(VaultAccessTypeEnum accessType, string vaultName)

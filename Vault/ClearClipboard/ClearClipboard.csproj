@@ -9,6 +9,8 @@
     <RootNamespace>ClearClipboard</RootNamespace>
     <AssemblyName>ClearClipboard</AssemblyName>
     <UseWindowsForms>true</UseWindowsForms>
+    <!-- Prevent NETSDK1151 when parent project publishes as self-contained -->
+    <SelfContained>false</SelfContained>
   </PropertyGroup>
 
 </Project>

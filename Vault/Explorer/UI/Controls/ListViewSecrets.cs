@@ -30,12 +30,17 @@ namespace Microsoft.Vault.Explorer
             DoubleBuffered = true;
             Font = new Font("Segoe UI", 9.75F);
             _tags = new Dictionary<string, TagMenuItem>();
+        }
 
-            HandleCreated += (s, e) =>
+        protected override void OnHandleCreated(EventArgs e)
+        {
+            base.OnHandleCreated(e);
+            if (ThemeHelper.IsDarkMode)
             {
-                if (ThemeHelper.IsDarkMode)
-                    ThemeHelper.ApplyDarkModeToHandle(Handle);
-            };
+                ThemeHelper.ApplyDarkModeToHandle(Handle);
+                // Force the dark mode flag on this window for group headers
+                ThemeHelper.SetDarkModeForWindow(Handle, true);
+            }
         }
 
         public ListViewItemBase FirstSelectedItem => SelectedItems.Count > 0 ? SelectedItems[0] as ListViewItemBase : null;

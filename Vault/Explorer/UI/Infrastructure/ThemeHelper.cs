@@ -147,6 +147,16 @@ namespace Microsoft.Vault.Explorer
         }
 
         /// <summary>
+        /// Sets the immersive dark mode attribute on a window so the OS renders
+        /// all common controls (including ListView group headers) in dark mode colors.
+        /// </summary>
+        public static void SetDarkModeForWindow(IntPtr handle, bool darkMode)
+        {
+            int value = darkMode ? 1 : 0;
+            DwmSetWindowAttribute(handle, DWMWA_USE_IMMERSIVE_DARK_MODE, ref value, sizeof(int));
+        }
+
+        /// <summary>
         /// Applies dark/light mode colors to a PropertyGrid so category headers and values are readable.
         /// </summary>
         public static void ApplyToPropertyGrid(PropertyGrid grid)
