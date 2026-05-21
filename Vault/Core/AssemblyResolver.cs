@@ -22,11 +22,11 @@ namespace Microsoft.Vault.Core
             // Assembly resolver
             AppDomain.CurrentDomain.AssemblyResolve += (s, e) =>
             {
-                var an = new AssemblyName(e.Name).Name;
+                var an = new AssemblyName(e.Name!).Name;
 
-                string fileName;
+                string? fileName;
 
-                if (assemblyResolveMap.TryGetValue(an, out fileName))
+                if (an is not null && assemblyResolveMap.TryGetValue(an, out fileName))
                 {
                     // Obtain the (full) file path
                     fileName = Directory.EnumerateFiles(rootDir, fileName,

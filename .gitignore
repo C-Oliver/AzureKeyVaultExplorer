@@ -1,14 +1,38 @@
-.packages
-PackageRoot/*
-**/TestResults/*
-**/.vs/*
-**/bin/*
-**/obj/*
-msbuild.log
+# Build outputs
+**/bin/
+**/obj/
+**/TestResults/
+**/.vs/
+
+# NuGet
+packages/
+.packages/
+PackageRoot/
+
+# IDE and editor files
 *.user
-*.trace
+*.suo
 *.sdf
 *.tmp
+*.swp
+*.swo
+*~
+.idea/
+
+# OS files
+Thumbs.db
+Desktop.ini
+.DS_Store
+
+# Build artifacts
+msbuild.log
+*.trace
+publish/
+CoverageReport/
+
+# Backup files
+*.bak
+
+# Office temp files
 ~*.docx
 ~*.xlsx
-packages/*

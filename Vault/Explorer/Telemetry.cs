@@ -19,20 +19,22 @@ namespace Microsoft.Vault.Explorer
 {
     public static class Telemetry
     {
-        /// <summary>
-        /// Application Insights portal:
-        /// https://ms.portal.azure.com/#resource/subscriptions/34f2c5cf-b95b-4922-aad3-cc4c8ad13afb/resourcegroups/Default-ApplicationInsights-CentralUS/providers/microsoft.insights/components/vaultexplorer
-        /// Application Insights analytics:
-        /// https://analytics.applicationinsights.io/subscriptions/34f2c5cf-b95b-4922-aad3-cc4c8ad13afb/resourcegroups/Default-ApplicationInsights-CentralUS/components/vaultexplorer
-        /// </summary>
         public static TelemetryClient Default { get; private set; }
 
         public static void Init()
         {
             TelemetryConfiguration config = TelemetryConfiguration.CreateDefault();
-            config.InstrumentationKey = "ebe1f199-8317-4c4f-913c-5b569f1cba9f";
-            config.DisableTelemetry = Settings.Default.DisableTelemetry || Microsoft.Vault.Library.Utils.IsDebug;
-            Default = new TelemetryClient(config) { InstrumentationKey = config.InstrumentationKey };
+            var telemetryConfig = AppConfig.Current.Telemetry;
+            if (telemetryConfig.Enabled && !string.IsNullOrEmpty(telemetryConfig.ConnectionString))
+            {
+                config.ConnectionString = telemetryConfig.ConnectionString;
+                config.DisableTelemetry = Settings.Default.DisableTelemetry;
+            }
+            else
+            {
+                config.DisableTelemetry = true;
+            }
+            Default = new TelemetryClient(config);
             config.TelemetryInitializers.Add(new TelemetryInitializer());
         }
     }
@@ -43,31 +45,25 @@ namespace Microsoft.Vault.Explorer
         private static readonly string UserDomainName = Environment.UserDomainName;
         private static readonly string UserName = Environment.UserName;
         private static readonly string AppVersion = Utils.GetFileVersionString("", Path.GetFileName(Application.ExecutablePath));
-        private static readonly string CurrentUILanguageTag = CultureInfo.CurrentUICulture.IetfLanguageTag;
         private static readonly string OSVersion = Environment.OSVersion.ToString();
-        private static readonly string Is64BitOperatingSystem = Environment.Is64BitOperatingSystem ? "true" : "false";
-        private static readonly string Is64BitProcess = Environment.Is64BitProcess ? "true" : "false";
-        private static readonly string MachineName = Environment.MachineName;
-        private static readonly string ProcessorCount = Environment.ProcessorCount.ToString();
-        private static readonly string ClrVersion = Environment.Version.ToString();
 
         public void Initialize(ITelemetry telemetry)
         {
             telemetry.Context.Session.Id = SessionId.ToString();
 
-            telemetry.Context.User.AccountId = UserDomainName;
-            telemetry.Context.User.Id = UserName;
+            // Do not send PII — use hashed identifiers only
+            telemetry.Context.User.AccountId = ComputeHash(UserDomainName);
+            telemetry.Context.User.Id = ComputeHash(UserName);
 
             telemetry.Context.Component.Version = AppVersion;
 
-            telemetry.Context.Device.Language = CurrentUILanguageTag;
             telemetry.Context.Device.OperatingSystem = OSVersion;
+        }
 
-            telemetry.Context.Properties.Add("64BitOS", Is64BitOperatingSystem);
-            telemetry.Context.Properties.Add("64BitProcess", Is64BitProcess);
-            telemetry.Context.Properties.Add("MachineName", MachineName);
-            telemetry.Context.Properties.Add("ProcessorCount", ProcessorCount);
-            telemetry.Context.Properties.Add("ClrVersion", ClrVersion);
+        private static string ComputeHash(string value)
+        {
+            var bytes = System.Security.Cryptography.SHA256.HashData(Encoding.UTF8.GetBytes(value));
+            return Convert.ToHexString(bytes)[..16]; // truncated hash, not reversible
         }
     }
 
@@ -88,6 +84,10 @@ namespace Microsoft.Vault.Explorer
         public FormTelemetry()
         {
             _telemetryData = new PageViewTelemetry(!string.IsNullOrWhiteSpace(this.Name) ? this.Name : this.GetType().Name);
+            // Modern form defaults
+            AutoScaleMode = AutoScaleMode.Dpi;
+            StartPosition = FormStartPosition.CenterParent;
+            Font = new System.Drawing.Font("Segoe UI", 9.75F);
         }
 
         /// <summary>
@@ -97,6 +97,7 @@ namespace Microsoft.Vault.Explorer
         protected override void OnLoad(EventArgs e)
         {
             _startTime = DateTimeOffset.UtcNow;
+            ThemeHelper.ApplyTo(this);
             base.OnLoad(e);
         }
 

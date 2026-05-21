@@ -13,20 +13,17 @@ namespace ClearClipboard
 
     class Program
     {
-        public static string CalculateMd5(string value)
+        public static string CalculateHash(string value)
         {
             byte[] buff = Encoding.UTF8.GetBytes(value);
-            using (MD5 md5 = MD5.Create())
-            {
-                byte[] hash = md5.ComputeHash(buff);
-                return BitConverter.ToString(hash).Replace("-", string.Empty).ToLower();
-            }
+            byte[] hash = SHA256.HashData(buff);
+            return BitConverter.ToString(hash).Replace("-", string.Empty).ToLower();
         }
 
         [STAThread]
         static int Main(string[] args)
         {           
-            Regex validMd5 = new Regex("^[0-9a-fA-F]{32}$", RegexOptions.Compiled | RegexOptions.Singleline);
+            Regex validMd5 = new Regex("^[0-9a-fA-F]{32,64}$", RegexOptions.Compiled | RegexOptions.Singleline);
             if (args.Length != 2)
             {
                 Console.WriteLine("Clears clipboard after specified interval if current content in the clipboard matches specified MD5");
@@ -64,21 +61,25 @@ namespace ClearClipboard
                 }
 
                 var dataObj = Clipboard.GetDataObject();
-                if (!dataObj.GetDataPresent(DataFormats.Text))
+                if (dataObj is null || !dataObj.GetDataPresent(DataFormats.Text))
                 {
                     Console.WriteLine("Clipboard is already empty");
                     return 0;
                 }
-                if (0 == string.Compare(md5, CalculateMd5(dataObj.GetData(DataFormats.Text).ToString()), true))
+                string? clipText = dataObj.GetData(DataFormats.Text)?.ToString();
+                if (clipText is not null && string.Equals(md5, CalculateHash(clipText), StringComparison.OrdinalIgnoreCase))
                 {
                     if (dataObj.GetDataPresent(DataFormats.FileDrop)) // In case clipboard has temp files ("cut" mode) we will delete them
                     {
-                        string[] files = (string[])dataObj.GetData(DataFormats.FileDrop);
-                        foreach (var file in files)
+                        string[]? files = dataObj.GetData(DataFormats.FileDrop) as string[];
+                        if (files is not null)
                         {
-                            if (file.StartsWith(Path.GetTempPath().TrimEnd('\\'), StringComparison.CurrentCultureIgnoreCase))
+                            foreach (var file in files)
                             {
-                                File.Delete(file);
+                                if (file.StartsWith(Path.GetTempPath().TrimEnd('\\'), StringComparison.CurrentCultureIgnoreCase))
+                                {
+                                    File.Delete(file);
+                                }
                             }
                         }
                     }

@@ -1,0 +1,130 @@
+name: CI
+
+on:
+  push:
+    branches: [ main, master ]
+  pull_request:
+    branches: [ main, master ]
+
+permissions:
+  contents: read
+
+env:
+  DOTNET_VERSION: '10.0.x'
+  SOLUTION: 'AzureKeyVaultExplorer.sln'
+  CONFIGURATION: 'Release'
+
+jobs:
+  build:
+    runs-on: windows-latest
+    
+    steps:
+    - name: Checkout
+      uses: actions/checkout@v4
+
+    - name: Setup .NET
+      uses: actions/setup-dotnet@v4
+      with:
+        dotnet-version: ${{ env.DOTNET_VERSION }}
+
+    - name: Restore dependencies
+      run: dotnet restore ${{ env.SOLUTION }}
+
+    - name: Build
+      run: dotnet build ${{ env.SOLUTION }} --configuration ${{ env.CONFIGURATION }} --no-restore
+
+    - name: Run Unit Tests with Coverage
+      run: |
+        dotnet test Vault/Tests/VaultExplorer.Tests.csproj `
+          --configuration ${{ env.CONFIGURATION }} `
+          --no-build `
+          --verbosity normal `
+          --collect:"XPlat Code Coverage" `
+          --results-directory ./TestResults `
+          --logger "trx;LogFileName=unit-tests.trx"
+
+    - name: Generate Coverage Report
+      uses: danielpalme/ReportGenerator-GitHub-Action@5
+      with:
+        reports: '**/TestResults/**/coverage.cobertura.xml'
+        targetdir: 'CoverageReport'
+        reporttypes: 'HtmlInline_AzurePipelines;Cobertura;MarkdownSummaryGithub'
+
+    - name: Upload Test Results
+      uses: actions/upload-artifact@v4
+      if: always()
+      with:
+        name: test-results
+        path: |
+          TestResults/**/*.trx
+        retention-days: 30
+
+    - name: Upload Code Coverage Report
+      uses: actions/upload-artifact@v4
+      if: always()
+      with:
+        name: code-coverage
+        path: CoverageReport/
+        retention-days: 30
+
+    - name: Add Coverage Summary to PR
+      uses: marocchino/sticky-pull-request-comment@v2
+      if: github.event_name == 'pull_request'
+      with:
+        path: CoverageReport/SummaryGithub.md
+
+  publish:
+    runs-on: windows-latest
+    needs: build
+    if: github.ref == 'refs/heads/main' || github.ref == 'refs/heads/master'
+
+    steps:
+    - name: Checkout
+      uses: actions/checkout@v4
+
+    - name: Setup .NET
+      uses: actions/setup-dotnet@v4
+      with:
+        dotnet-version: ${{ env.DOTNET_VERSION }}
+
+    - name: Configure appsettings for release
+      shell: pwsh
+      run: |
+        $config = Get-Content Vault/Explorer/appsettings.json | ConvertFrom-Json
+        $config.Telemetry.Enabled = $true
+        if ('${{ secrets.APPINSIGHTS_CONNECTION_STRING }}') {
+          $config.Telemetry.ConnectionString = '${{ secrets.APPINSIGHTS_CONNECTION_STRING }}'
+        }
+        $config | ConvertTo-Json -Depth 5 | Set-Content Vault/Explorer/appsettings.json
+
+    - name: Publish Release (self-contained)
+      run: |
+        dotnet publish Vault/Explorer/VaultExplorer.csproj `
+          --configuration Release `
+          --runtime win-x64 `
+          --self-contained true `
+          -p:PublishSingleFile=true `
+          --output ./publish/self-contained
+
+    - name: Publish Release (framework-dependent)
+      run: |
+        dotnet publish Vault/Explorer/VaultExplorer.csproj `
+          --configuration Release `
+          --runtime win-x64 `
+          --self-contained false `
+          -p:PublishSingleFile=true `
+          --output ./publish/framework-dependent
+
+    - name: Upload Self-Contained Build
+      uses: actions/upload-artifact@v4
+      with:
+        name: VaultExplorer-win-x64-self-contained
+        path: publish/self-contained/
+        retention-days: 90
+
+    - name: Upload Framework-Dependent Build
+      uses: actions/upload-artifact@v4
+      with:
+        name: VaultExplorer-win-x64
+        path: publish/framework-dependent/
+        retention-days: 90

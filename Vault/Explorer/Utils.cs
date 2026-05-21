@@ -6,7 +6,6 @@ using Newtonsoft.Json;
 using System;
 using System.Collections.Generic;
 using System.Collections.Specialized;
-using System.Deployment.Application;
 using System.Diagnostics;
 using System.IO;
 using System.Linq;
@@ -16,8 +15,6 @@ using System.Text;
 using System.Text.RegularExpressions;
 using System.Windows.Forms;
 using Microsoft.Vault.Library;
-using Windows.Data.Xml.Dom;
-using Windows.UI.Notifications;
 using Microsoft.Vault.Core;
 
 namespace Microsoft.Vault.Explorer
@@ -154,49 +151,25 @@ namespace Microsoft.Vault.Explorer
                 var n = Enumerable.Range(0, 1).Select(i => NumbersSet[r.Next(0, NumbersSet.Length)]);
                 var s = Enumerable.Range(0, 4).Select(i => SpecialCharsSet[r.Next(0, SpecialCharsSet.Length)]);
                 var a = Enumerable.Range(0, length - 11).Select(i => All[r.Next(0, All.Length)]);
-                return Encoding.ASCII.GetString(u.Concat(l).Concat(n).Concat(s).Concat(a).Shuffle().ToArray());
+                return Encoding.ASCII.GetString(u.Concat(l).Concat(n).Concat(s).Concat(a).Shuffle(RandomThreadSafe.Instance).ToArray());
             }
         }
 
         public static string NewApiKey(int length = 64)
         {
-            // Using Crypto Random Generator to fetch bytes.
-            var r = new RNGCryptoServiceProvider();
             byte[] buff = new byte[length];
-            r.GetBytes(buff);
-            r.Dispose();
+            RandomNumberGenerator.Fill(buff);
             return Convert.ToBase64String(buff);
         }
 
         public static void ClickOnce_SetAddRemoveProgramsIcon()
         {
-            if (ApplicationDeployment.IsNetworkDeployed && ApplicationDeployment.CurrentDeployment.IsFirstRun)
-            {
-                try
-                {
-                    using (RegistryKey myUninstallKey = Registry.CurrentUser.OpenSubKey(@"Software\Microsoft\Windows\CurrentVersion\Uninstall"))
-                    {
-                        foreach (var subKeyName in myUninstallKey.GetSubKeyNames())
-                        {
-                            using (RegistryKey myKey = myUninstallKey.OpenSubKey(subKeyName, true))
-                            {
-                                object myValue = myKey.GetValue("DisplayName");
-                                if (myValue != null && myValue.ToString() == Utils.ProductName)
-                                {
-                                    myKey.SetValue("DisplayIcon", Application.ExecutablePath);
-                                    break;
-                                }
-                            }
-                        }
-                    }
-                }
-                catch { }
-            }
+            // ClickOnce (ApplicationDeployment) is not available in .NET 10; no-op.
         }
 
         public static X509Certificate2 SelectCertFromStore(StoreName name, StoreLocation location, string vaultAlias, IntPtr hwndParent)
         {
-            X509Store store = new X509Store(name, location);
+            using var store = new X509Store(name, location);
             store.Open(OpenFlags.ReadOnly | OpenFlags.OpenExistingOnly);
             X509Certificate2Collection notExpiredAndSortedCerts = new X509Certificate2Collection(
                 (from cert in store.Certificates.Find(X509FindType.FindByTimeValid, DateTime.Now, false).Cast<X509Certificate2>()
@@ -233,7 +206,7 @@ namespace Microsoft.Vault.Explorer
             dataObj.SetData(DataFormats.UnicodeText, link);
             // Add HTML format and .URL as a file
             dataObj.SetData(DataFormats.Html, string.Format(html, link, name));
-            var tempPath = Path.Combine(Path.GetTempPath(), name + ContentType.KeyVaultLink.ToExtension());
+            var tempPath = Path.Combine(Path.GetTempPath(), Path.GetRandomFileName() + ContentType.KeyVaultLink.ToExtension());
             File.WriteAllText(tempPath, $"[InternetShortcut]\r\nURL={link}\r\nIconIndex=47\r\nIconFile=%SystemRoot%\\system32\\SHELL32.dll");
             var sc = new StringCollection();
             sc.Add(tempPath);
@@ -256,33 +229,43 @@ namespace Microsoft.Vault.Explorer
         public static void LaunchPowerShell(string vaultsJsonFile, string firstVaultName, string secondVaultName)
         {
             string vaultPs1 = Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "Vault.ps1");
-            ProcessStartInfo sInfo = new ProcessStartInfo("powershell.exe",
-                $"-NoExit -NoProfile -NoLogo -ExecutionPolicy Unrestricted -File \"{vaultPs1}\" \"{vaultsJsonFile}\" \"{firstVaultName}\" \"{secondVaultName}\"")
+            // Validate file path doesn't contain injection characters
+            if (vaultsJsonFile.IndexOfAny(new[] { '"', '\'' , '`', '$', ';', '|', '&' }) >= 0)
+                throw new ArgumentException("Vault config file path contains invalid characters", nameof(vaultsJsonFile));
+            var sInfo = new ProcessStartInfo("powershell.exe")
             {
                 UseShellExecute = true,
                 LoadUserProfile = true
             };
+            sInfo.ArgumentList.Add("-NoExit");
+            sInfo.ArgumentList.Add("-NoProfile");
+            sInfo.ArgumentList.Add("-NoLogo");
+            sInfo.ArgumentList.Add("-ExecutionPolicy");
+            sInfo.ArgumentList.Add("RemoteSigned");
+            sInfo.ArgumentList.Add("-File");
+            sInfo.ArgumentList.Add(vaultPs1);
+            sInfo.ArgumentList.Add(vaultsJsonFile);
+            sInfo.ArgumentList.Add(firstVaultName);
+            sInfo.ArgumentList.Add(secondVaultName);
             Process.Start(sInfo);
         }
 
         public static void ShowToast(string body)
         {
-            // Get a toast XML template
-            XmlDocument toastXml = ToastNotificationManager.GetTemplateContent(ToastTemplateType.ToastImageAndText02);
-
-            // Fill in the text elements
-            XmlNodeList stringElements = toastXml.GetElementsByTagName("text");
-            stringElements[0].AppendChild(toastXml.CreateTextNode(Utils.AppName));
-            stringElements[1].AppendChild(toastXml.CreateTextNode(body));
-
-            // Absolute path to an image
-            var imagePath = "file:///" + Path.ChangeExtension(Application.ExecutablePath, ".png");
-            XmlNodeList imageElements = toastXml.GetElementsByTagName("image");
-            imageElements[0].Attributes.GetNamedItem("src").NodeValue = imagePath;
-
-            // Create and show the toast
-            ToastNotification toast = new ToastNotification(toastXml);
-            ToastNotificationManager.CreateToastNotifier(Utils.AppName).Show(toast);
+            // WinRT toast notifications (Windows.UI.Notifications) are not directly available in .NET 10.
+            // Use a simple notification balloon or MessageBox as fallback.
+            var icon = new NotifyIcon
+            {
+                Visible = true,
+                Icon = System.Drawing.SystemIcons.Information,
+                BalloonTipTitle = Utils.AppName,
+                BalloonTipText = body
+            };
+            icon.ShowBalloonTip(3000);
+            // Clean up after a delay
+            var timer = new System.Windows.Forms.Timer { Interval = 5000 };
+            timer.Tick += (s, e) => { icon.Dispose(); timer.Dispose(); };
+            timer.Start();
         }
     }
 }

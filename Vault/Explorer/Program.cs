@@ -6,9 +6,7 @@ using Microsoft.Vault.Library;
 using System;
 using System.Drawing;
 using System.Linq;
-using System.Security.Permissions;
 using System.Reflection;
-using System.Runtime.Remoting.Messaging;
 using System.Threading;
 using System.Threading.Tasks;
 using System.Windows.Forms;
@@ -18,8 +16,6 @@ namespace Microsoft.Vault.Explorer
     public static class Program
     {
         private static readonly System.Windows.Forms.Timer IdleTimer = new System.Windows.Forms.Timer();
-        private static readonly int TimeIntervalForApplicationIdle = (int)TimeSpan.FromHours(1).TotalMilliseconds;
-        private static readonly int TimeIntervalForUserInput =  (int)TimeSpan.FromMinutes(1).TotalMilliseconds;
 
         /// <summary>
         /// The main entry point for the application.
@@ -28,10 +24,17 @@ namespace Microsoft.Vault.Explorer
         static void Main()
         {
             IdleTimer.Enabled = false;
-            Application.EnableVisualStyles();
-            Application.SetCompatibleTextRenderingDefault(false);
+            // Modern .NET 10 WinForms initialization:
+            // - Applies high DPI mode (PerMonitorV2 from csproj)
+            // - Sets default font (Segoe UI 9.75pt from csproj)
+            // - Enables visual styles and compatible text rendering
+            ApplicationConfiguration.Initialize();
+            // Follow the Windows system light/dark mode setting
+            Application.SetColorMode(SystemColorMode.System);
+            AppConfig.Load();
+            AppLogger.Init();
             Telemetry.Init();
-            Application.ApplicationExit += (s, e) => Telemetry.Default.Flush();
+            Application.ApplicationExit += (s, e) => { Telemetry.Default.Flush(); AppLogger.Shutdown(); };
             Application.ApplicationExit += (s, e) => DeleteTokenCacheOnApplicationExit();
             Application.SetUnhandledExceptionMode(UnhandledExceptionMode.CatchException);
             Application.ThreadException += (s, e) => TrackExceptionAndShowError(e.Exception);
@@ -45,7 +48,7 @@ namespace Microsoft.Vault.Explorer
             LeaveIdleMessageFilter limf = new LeaveIdleMessageFilter(IdleTimer);
             Application.AddMessageFilter(limf);
             Application.Idle += new EventHandler(ApplicationIdle);
-            IdleTimer.Interval = TimeIntervalForApplicationIdle;
+            IdleTimer.Interval = (int)TimeSpan.FromMinutes(AppConfig.Current.Application.IdleTimeoutMinutes).TotalMilliseconds;
             IdleTimer.Tick += TimeDone;
             var form = new MainForm(ActivationUri.Parse());
             if (!form.IsDisposed)
@@ -99,7 +102,7 @@ namespace Microsoft.Vault.Explorer
             IdleTimer.Stop();
             const string message = "VaultExplorer is being closed due to inactivity. Do you want to continue working on it?";
             const string caption = "Closing Vault Explorer";
-            using (AutoClosingMessageBox autoClosingMessageBox = new AutoClosingMessageBox(TimeIntervalForUserInput))
+            using (AutoClosingMessageBox autoClosingMessageBox = new AutoClosingMessageBox((int)TimeSpan.FromMinutes(1).TotalMilliseconds))
             {
                 var result = autoClosingMessageBox.Show(message, caption, MessageBoxButtons.YesNo, MessageBoxIcon.Question, MessageBoxDefaultButton.Button1);
                 if (result == DialogResult.No)
@@ -117,7 +120,7 @@ namespace Microsoft.Vault.Explorer
         {
             if (e is OperationCanceledException)
             {
-                object o = CallContext.LogicalGetData($"{nameof(UxOperation) + nameof(CancellationToken)}");
+                object? o = UxOperation.CancelledToken;
                 if (o != null) return; // Do not show any dialog to user
             }
             // TrackException
@@ -136,8 +139,7 @@ namespace Microsoft.Vault.Explorer
     /// This class filters (listens to) all messages for the application and if
     /// a relevant message (such as mouse or keyboard) is received then it resets the timer.
     /// </summary>
-    [SecurityPermission(SecurityAction.LinkDemand, Flags = SecurityPermissionFlag.UnmanagedCode)]
-    public class LeaveIdleMessageFilter : IMessageFilter
+    internal sealed class LeaveIdleMessageFilter : IMessageFilter
     {
         const int WM_NCLBUTTONDOWN = 0x00A1;
         const int WM_NCLBUTTONUP = 0x00A2;
@@ -160,7 +162,7 @@ namespace Microsoft.Vault.Explorer
         const int WM_XBUTTONUP = 0x020C;
 
         // The Messages array must be sorted due to use of Array.BinarySearch
-        static int[] ActivityMessages = new int[] {WM_NCLBUTTONDOWN,
+        static readonly int[] ActivityMessages = new int[] {WM_NCLBUTTONDOWN,
             WM_NCLBUTTONUP, WM_NCRBUTTONDOWN, WM_NCRBUTTONUP, WM_NCMBUTTONDOWN,
             WM_NCMBUTTONUP, WM_NCXBUTTONDOWN, WM_NCXBUTTONUP, WM_KEYDOWN, WM_KEYUP,
             WM_LBUTTONDOWN, WM_LBUTTONUP, WM_RBUTTONDOWN, WM_RBUTTONUP,

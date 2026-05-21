@@ -20,13 +20,13 @@ namespace Microsoft.Vault.Library
             }
         }
 
-        public static Dictionary<string, string> AddMd5ChangedBy(IDictionary<string, string> tags, string value, string changedBy)
+        public static Dictionary<string, string> AddHashAndChangedBy(IDictionary<string, string> tags, string value, string changedBy)
         {
             tags = tags ?? new Dictionary<string, string>();
             tags[Consts.ChangedByKey] = changedBy ?? $"{Environment.UserDomainName}\\{Environment.UserName}";
             if (value != null)
             {
-                tags[Consts.Md5Key] = CalculateMd5(value);
+                tags[Consts.Md5Key] = CalculateHash(value);
             }
             return new Dictionary<string, string>(tags);
         }
@@ -40,17 +40,14 @@ namespace Microsoft.Vault.Library
             return tags[Consts.ChangedByKey];
         }
 
-        public static string CalculateMd5(string value)
+        public static string CalculateHash(string value)
         {
             byte[] buff = Encoding.UTF8.GetBytes(value);
-            using (MD5 md5 = MD5.Create())
-            {
-                byte[] hash = md5.ComputeHash(buff);
-                return BitConverter.ToString(hash).Replace("-", string.Empty).ToLower();
-            }
+            byte[] hash = System.Security.Cryptography.SHA256.HashData(buff);
+            return BitConverter.ToString(hash).Replace("-", string.Empty).ToLower();
         }
 
-        public static string GetMd5(IDictionary<string, string> tags)
+        public static string GetHash(IDictionary<string, string> tags)
         {
             if ((tags == null) || (!tags.ContainsKey(Consts.Md5Key)))
             {
@@ -82,7 +79,7 @@ namespace Microsoft.Vault.Library
         /// <typeparam name="T">The type of object being enumerated</typeparam>
         /// <param name="rand">An instance of a random number generator</param>
         /// <returns>A random element from a list, or null if the list is empty</returns>
-        public static T Random<T>(this IEnumerable<T> list, CryptoRandomGenerator rand)
+        public static T? Random<T>(this IEnumerable<T> list, CryptoRandomGenerator rand)
         {
             if (list != null && list.Count() > 0)
                 return list.ElementAt(rand.Next(list.Count()));

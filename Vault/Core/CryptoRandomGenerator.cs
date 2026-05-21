@@ -11,19 +11,12 @@ namespace Microsoft.Vault.Core
     /// </summary>
     public sealed class CryptoRandomGenerator : IDisposable
     {
-        private readonly RNGCryptoServiceProvider rngCsp;
-  
-        public CryptoRandomGenerator()
-        {
-            rngCsp = new RNGCryptoServiceProvider();
-        }
-
         /// <summary>
         /// Dispose of CryptoRandomGenerator
         /// </summary>
         public void Dispose()
         {
-            rngCsp.Dispose();
+            // No-op: RandomNumberGenerator static methods don't require disposal
         }
 
         /// <summary>
@@ -65,10 +58,8 @@ namespace Microsoft.Vault.Core
 
         private uint GetRandomUInt()
         {
-            // Create a byte array to hold the random value.
-            byte[] randomNumber = new byte[sizeof(Int32)];
-            // Fill the array with a random value.
-            rngCsp.GetBytes(randomNumber);
+            byte[] randomNumber = new byte[sizeof(int)];
+            RandomNumberGenerator.Fill(randomNumber);
             return BitConverter.ToUInt32(randomNumber, 0);
         }
     }

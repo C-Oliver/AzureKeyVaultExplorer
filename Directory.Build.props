@@ -1,0 +1,40 @@
+<!--
+// Copyright (c) Microsoft Corporation. All rights reserved.
+// Licensed under the MIT License. See License.txt in the project root for license information.
+-->
+<Project>
+  <PropertyGroup>
+    <TargetFramework>net10.0-windows</TargetFramework>
+    <LangVersion>14.0</LangVersion>
+    <Nullable>enable</Nullable>
+    <ImplicitUsings>disable</ImplicitUsings>
+    <!-- Suppress noisy nullable and obsolete warnings inherited from pre-.NET-10 code -->
+    <NoWarn>CS8600;CS8601;CS8602;CS8603;CS8604;CS8618;CS8622;CS8625;CS8629;CS8765;CS8767;CS8612;CS0108;CS0219;CS0618;CS0672;SYSLIB0057;WFDEV004;NU1510</NoWarn>
+    <PlatformTarget>x64</PlatformTarget>
+    <PlatformTarget Condition="'$(BuildingInsideVisualStudio)' != ''">AnyCPU</PlatformTarget>
+    <Platforms>x64;AnyCPU</Platforms>
+    <GenerateAssemblyInfo>true</GenerateAssemblyInfo>
+    <Version>2.0.0</Version>
+    <AssemblyVersion>2.0.0.0</AssemblyVersion>
+    <FileVersion>2.0.0.0</FileVersion>
+    <InformationalVersion>2.0.0 (.NET 10)</InformationalVersion>
+  </PropertyGroup>
+
+  <PropertyGroup Condition="'$(Configuration)' == 'Debug'">
+    <DebugSymbols>true</DebugSymbols>
+    <DefineConstants>DEBUG;TRACE</DefineConstants>
+    <DebugType>full</DebugType>
+  </PropertyGroup>
+
+  <PropertyGroup Condition="'$(Configuration)' == 'Release'">
+    <DefineConstants>TRACE</DefineConstants>
+    <Optimize>true</Optimize>
+    <DebugType>pdbonly</DebugType>
+  </PropertyGroup>
+
+  <PropertyGroup Condition="Exists('$(DOWNLOADSECUREFILE_SECUREFILEPATH)')">
+    <SignAssembly>true</SignAssembly>
+    <AssemblyOriginatorKeyFile>$(DOWNLOADSECUREFILE_SECUREFILEPATH)</AssemblyOriginatorKeyFile>
+    <DelaySign>true</DelaySign>
+  </PropertyGroup>
+</Project>

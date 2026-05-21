@@ -1,11 +1,106 @@
 # ![bigKey](./Screenshots/Key64x64.png) Azure Key Vault Explorer
 
-Azure Key Vault Explorer - be productive when working with secrets!
+Azure Key Vault Explorer — a desktop tool for managing Azure Key Vault secrets and certificates.
 
-#### [Click here to install the latest version (https://aka.ms/ve)](https://aka.ms/ve)
+## Getting Started
 
-Authors: Eli Zeitlin, Gokhan Ozhan, Anna Zeitlin  
-Contact: [Azure Key Vault Explorer Developers](mailto:Azure Key Vault Explorer Developers <vedev@microsoft.com>>)
+### Prerequisites
+
+- [.NET 10 SDK](https://dotnet.microsoft.com/download/dotnet/10.0) (Windows)
+- Windows 10/11 (WinForms application)
+
+### Build and Run
+
+```bash
+git clone https://github.com/AzureKeyVaultExplorer/AzureKeyVaultExplorer.git
+cd AzureKeyVaultExplorer
+dotnet build
+dotnet run --project Vault/Explorer/VaultExplorer.csproj
+```
+
+### Run Tests
+
+```bash
+# Unit tests
+dotnet test Vault/Tests/VaultExplorer.Tests.csproj
+
+# UI automation tests (requires app to not be running)
+dotnet test Vault/UITests/VaultExplorer.UITests.csproj
+```
+
+## Project Structure
+
+```
+AzureKeyVaultExplorer/
+├── Directory.Build.props        # Central build configuration
+├── AzureKeyVaultExplorer.sln    # Solution file
+├── nuget.config                 # NuGet feed configuration
+├── Vault/
+│   ├── Core/                    # Shared utilities (Guard, CryptoRandom, etc.)
+│   ├── Library/                 # Key Vault client library (Vault, VaultAccess, etc.)
+│   ├── Explorer/                # WinForms desktop application
+│   ├── ClearClipboard/          # Helper app to clear clipboard after timeout
+│   ├── Tests/                   # Unit tests (xUnit)
+│   └── UITests/                 # UI automation tests (FlaUI + xUnit)
+├── Screenshots/                 # Application screenshots
+├── License.txt                  # MIT License
+└── SECURITY.md                  # Security policy
+```
+
+## Technology
+
+| Component | Version |
+|-----------|---------|
+| .NET | 10.0 |
+| C# | 14 |
+| UI | WinForms (dark mode, PerMonitorV2 DPI) |
+| Azure SDK | Azure.Identity, Azure.Security.KeyVault.Secrets/Certificates |
+| Auth | DefaultAzureCredential / InteractiveBrowserCredential |
+| Testing | xUnit (unit), FlaUI (UI automation) |
+| CI/CD | GitHub Actions |
+| Logging | Microsoft.Extensions.Logging |
+
+## Configuration
+
+The application is configured via `appsettings.json` deployed alongside the executable:
+
+```json
+{
+  "Telemetry": {
+    "ConnectionString": "",
+    "Enabled": false
+  },
+  "Azure": {
+    "ManagementEndpoint": "https://management.azure.com/",
+    "VaultDnsSuffix": "vault.azure.net",
+    "SubscriptionApiVersion": "2022-12-01",
+    "KeyVaultApiVersion": "2023-07-01"
+  },
+  "Application": {
+    "HelpUrl": "https://aka.ms/vaultexplorer",
+    "IdleTimeoutMinutes": 60
+  }
+}
+```
+
+### Sovereign Cloud Support
+
+For Azure Government, China, or other sovereign clouds, set environment variables:
+
+```bash
+set AZURE_KEYVAULT_DNS_SUFFIX=vault.usgovcloudapi.net
+set AZURE_MANAGEMENT_ENDPOINT=https://management.usgovcloudapi.net/
+```
+
+### CI/CD
+
+The project uses GitHub Actions (`.github/workflows/ci.yml`):
+- **Build**: Compiles, runs tests with code coverage on every push/PR
+- **Publish**: Produces self-contained and framework-dependent single-file EXEs on main branch
+- **Coverage**: Reports uploaded as artifacts, PR comments with summary
+
+Authors: Eli Zeitlin, Gokhan Ozhan, Anna Zeitlin
+Contact: [Azure Key Vault Explorer Developers](mailto:vedev@microsoft.com)
 
 ## Table of Contents
   * [Key features](#key-features)

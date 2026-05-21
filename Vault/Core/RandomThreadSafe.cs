@@ -17,7 +17,7 @@ namespace Microsoft.Vault.Core
         {
             get
             {
-                CryptoRandomGenerator result = _random.Value.Value;
+                CryptoRandomGenerator result = _random.Value!.Value;
                 if (null == result)
                 {
                     throw new OutOfMemoryException("Could not allocate crypto random number generator.");

@@ -3,6 +3,7 @@
 
 namespace Microsoft.Vault.Library
 {
+    using System;
     using System.Text.RegularExpressions;
 
     public static class Consts
@@ -27,15 +28,15 @@ namespace Microsoft.Vault.Library
 
         public const long PB = 1125899906842624;
 
-        public static Regex ValidVaultNameRegex = new Regex("^[0-9a-zA-Z-]{3,24}$", RegexOptions.Singleline | RegexOptions.Compiled);
+        public static readonly Regex ValidVaultNameRegex = new Regex("^[0-9a-zA-Z-]{3,24}$", RegexOptions.Singleline | RegexOptions.Compiled);
 
-        public static Regex ValidSecretNameRegex = new Regex("^[0-9a-zA-Z-]{1,127}$", RegexOptions.Singleline | RegexOptions.Compiled);
+        public static readonly Regex ValidSecretNameRegex = new Regex("^[0-9a-zA-Z-]{1,127}$", RegexOptions.Singleline | RegexOptions.Compiled);
 
-        public static Regex ValidBase64Regex = new Regex("^(?:[A-Za-z0-9+/]{4})*(?:[A-Za-z0-9+/]{2}==|[A-Za-z0-9+/]{3}=)?$", RegexOptions.Singleline | RegexOptions.Compiled);
+        public static readonly Regex ValidBase64Regex = new Regex("^(?:[A-Za-z0-9+/]{4})*(?:[A-Za-z0-9+/]{2}==|[A-Za-z0-9+/]{3}=)?$", RegexOptions.Singleline | RegexOptions.Compiled);
 
-        public static Regex ValidVaultItemHttpsUriRegex = new Regex(@"^https:\/\/(?<VaultName>[0-9a-z-]{3,24}).vault.azure.net(:443)?\/(?<Collection>keys|secrets|certificates)\/(?<Name>[0-9a-z-]{1,127})(\/(?<Version>[0-9a-f]{32}))?$", RegexOptions.Singleline | RegexOptions.Compiled | RegexOptions.IgnoreCase);
+        public static readonly Regex ValidVaultItemHttpsUriRegex = new Regex(@"^https:\/\/(?<VaultName>[0-9a-z-]{3,24}).vault.azure.net(:443)?\/(?<Collection>keys|secrets|certificates)\/(?<Name>[0-9a-z-]{1,127})(\/(?<Version>[0-9a-f]{32}))?$", RegexOptions.Singleline | RegexOptions.Compiled | RegexOptions.IgnoreCase);
 
-        public static Regex ValidVaultItemVaultUriRegex = new Regex(@"^vault:(\/?\/?(?<VaultName>[0-9a-z-]{3,24})\/((?<Collection>keys|secrets|certificates)\/(?<Name>[0-9a-z-]{1,127})(\/(?<Version>[0-9a-f]{32}))?)?)?$", RegexOptions.Singleline | RegexOptions.Compiled | RegexOptions.IgnoreCase);
+        public static readonly Regex ValidVaultItemVaultUriRegex = new Regex(@"^vault:(\/?\/?(?<VaultName>[0-9a-z-]{3,24})\/((?<Collection>keys|secrets|certificates)\/(?<Name>[0-9a-z-]{1,127})(\/(?<Version>[0-9a-f]{32}))?)?)?$", RegexOptions.Singleline | RegexOptions.Compiled | RegexOptions.IgnoreCase);
 
         public const int MaxSecretValueLength = 25 * 1024; // 25 KB
 
@@ -53,7 +54,14 @@ namespace Microsoft.Vault.Library
 
         internal const string VaultsJsonConfig = "Vaults.json";
 
-        internal const string AzureVaultUriFormat = "https://{0}.vault.azure.net";
+        /// <summary>
+        /// Vault DNS suffix — configurable for sovereign clouds.
+        /// Override via AZURE_KEYVAULT_DNS_SUFFIX environment variable.
+        /// </summary>
+        public static string VaultDnsSuffix { get; set; } =
+            Environment.GetEnvironmentVariable("AZURE_KEYVAULT_DNS_SUFFIX") ?? "vault.azure.net";
+
+        internal static string AzureVaultUriFormat => $"https://{{0}}.{VaultDnsSuffix}";
 
         internal const string SecretsEndpoint = "secrets";
 
