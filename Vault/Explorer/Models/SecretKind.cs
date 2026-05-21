@@ -83,8 +83,8 @@ namespace Microsoft.Vault.Explorer
         {
             Alias = alias;
             ToolTipText = Description = description;
-            NameRegex = new Regex(nameRegex, RegexOptions.Singleline | RegexOptions.Compiled | RegexOptions.NonBacktracking);
-            ValueRegex = new Regex(valueRegex, RegexOptions.Singleline | RegexOptions.Compiled | RegexOptions.NonBacktracking);
+            NameRegex = new Regex(nameRegex, RegexOptions.Singleline | RegexOptions.Compiled, TimeSpan.FromSeconds(5));
+            ValueRegex = new Regex(valueRegex, RegexOptions.Singleline | RegexOptions.Compiled, TimeSpan.FromSeconds(5));
             ValueTemplate = valueTemplate;
             CertificateFormat = certificateFormat;
             RequiredCustomTags = requiredCustomTags ?? new string[0];
