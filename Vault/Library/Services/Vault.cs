@@ -171,6 +171,14 @@ namespace Microsoft.Vault.Library
         public Vault(VaultAccessTypeEnum accessType, string primaryVaultName, string secondaryVaultName)
             : this(accessType, new string[] { primaryVaultName, secondaryVaultName }) { }
 
+        /// <summary>
+        /// Loads VaultsConfig from a JSON file. Use this to pre-populate config before constructing Vault.
+        /// </summary>
+        public static VaultsConfig LoadVaultsConfig(string vaultsConfigFile)
+        {
+            return DeserializeVaultsConfigFromFile(ref vaultsConfigFile);
+        }
+
         private static VaultsConfig DeserializeVaultsConfigFromFile(ref string vaultsConfigFile)
         {
             var settings = new JsonSerializerSettings()
@@ -199,41 +207,28 @@ namespace Microsoft.Vault.Library
                 : new Uri($"https://{vaultName}.{Consts.VaultDnsSuffix}/");
         }
 
-        // Cache credential per vault to avoid repeated sign-in prompts
-        private readonly Dictionary<string, Azure.Core.TokenCredential> _credentialCache = new(StringComparer.OrdinalIgnoreCase);
+        // Single shared credential for all vault operations — sign in once
+        private static Azure.Core.TokenCredential? _sharedCredential;
 
         private Azure.Core.TokenCredential GetCredential(VaultAccessTypeEnum accessType, string vaultName)
         {
-            if (_credentialCache.TryGetValue(vaultName, out var cached))
-                return cached;
+            // Reuse the same credential across all vaults — single sign-in
+            if (_sharedCredential != null)
+                return _sharedCredential;
 
-            Azure.Core.TokenCredential credential;
-
-            // Use configured credential from VaultsConfig if available
-            if (VaultsConfig.ContainsKey(vaultName))
-            {
-                var accessTypes = VaultsConfig[vaultName];
-                var accessList = accessType == VaultAccessTypeEnum.ReadOnly ? accessTypes.ReadOnly : accessTypes.ReadWrite;
-                if (accessList != null && accessList.Length > 0)
+            // DefaultAzureCredential tries (in order): Environment, Managed Identity,
+            // Visual Studio, Azure CLI, Azure PowerShell, Interactive Browser
+            // Works for all users regardless of their auth setup
+            _sharedCredential = new Azure.Identity.DefaultAzureCredential(
+                new Azure.Identity.DefaultAzureCredentialOptions
                 {
-                    var access = accessList.OrderBy(a => a.Order).First();
-                    var configured = access.AcquireToken(null);
-                    if (configured != null)
-                    {
-                        _credentialCache[vaultName] = configured;
-                        return configured;
-                    }
-                }
-            }
-
-            // Fall back to interactive browser credential with token cache persistence
-            credential = new InteractiveBrowserCredential(
-                new InteractiveBrowserCredentialOptions
-                {
-                    TokenCachePersistenceOptions = new TokenCachePersistenceOptions()
+                    ExcludeManagedIdentityCredential = false,
+                    ExcludeAzureCliCredential = false,
+                    ExcludeAzurePowerShellCredential = false,
+                    ExcludeVisualStudioCredential = false,
+                    ExcludeInteractiveBrowserCredential = false
                 });
-            _credentialCache[vaultName] = credential;
-            return credential;
+            return _sharedCredential;
         }
 
         private SecretClient CreateKeyVaultClientEx(VaultAccessTypeEnum accessType, string vaultName)

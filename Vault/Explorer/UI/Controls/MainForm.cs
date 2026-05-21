@@ -186,14 +186,19 @@ namespace Microsoft.Vault.Explorer
 
         private void SetCurrentVault()
         {
-            CurrentVault = new Vault(Utils.FullPathToJsonFile(Settings.Default.VaultsJsonFileLocation), VaultAccessTypeEnum.ReadWrite, CurrentVaultAlias.VaultNames);
-            // In case that subscription is chosen by the dialog, overwrite permissions taken from vaults.json
-            if (CurrentVaultAlias.UserAlias!=null)
+            // Load VaultsConfig first, then add subscription-based entry BEFORE creating Vault
+            // so GetCredential finds the right credential during construction
+            var vaultsConfig = Vault.LoadVaultsConfig(Utils.FullPathToJsonFile(Settings.Default.VaultsJsonFileLocation));
+            if (CurrentVaultAlias.UserAlias != null)
             {
-                CurrentVault.VaultsConfig[CurrentVaultAlias.VaultNames[0]]= new VaultAccessType(
-                    new VaultAccess[] { new VaultAccessUserInteractive(CurrentVaultAlias.DomainHint, CurrentVaultAlias.UserAlias) },
-                    new VaultAccess[] { new VaultAccessUserInteractive(CurrentVaultAlias.DomainHint, CurrentVaultAlias.UserAlias) });
+                foreach (var vaultName in CurrentVaultAlias.VaultNames)
+                {
+                    vaultsConfig[vaultName] = new VaultAccessType(
+                        new VaultAccess[] { new VaultAccessUserInteractive(CurrentVaultAlias.DomainHint, CurrentVaultAlias.UserAlias) },
+                        new VaultAccess[] { new VaultAccessUserInteractive(CurrentVaultAlias.DomainHint, CurrentVaultAlias.UserAlias) });
+                }
             }
+            CurrentVault = new Vault(vaultsConfig, VaultAccessTypeEnum.ReadWrite, CurrentVaultAlias.VaultNames);
         }
 
         private async void uxMenuItemRefresh_Click(object sender, EventArgs e)
