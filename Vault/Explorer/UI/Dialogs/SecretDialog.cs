@@ -209,7 +209,7 @@ namespace Microsoft.Vault.Explorer
             }
 
             ToggleCertificateMode(PropertyObject.ContentType.IsCertificate());
-            uxTextBoxValue.Refresh();
+            RefreshEditor();
         }
 
         private void SetUpTextBoxValue()
@@ -259,8 +259,24 @@ namespace Microsoft.Vault.Explorer
                 if (_fallbackTextBox != null)
                     _fallbackTextBox.Text = value;
                 else if (uxTextBoxValue != null)
-                    SecretValueText = value;
+                    uxTextBoxValue.Text = value;
             }
+        }
+
+        private bool IsEditorReadOnly
+        {
+            get => uxTextBoxValue?.ReadOnly ?? _fallbackTextBox?.ReadOnly ?? false;
+            set
+            {
+                if (uxTextBoxValue != null) uxTextBoxValue.ReadOnly = value;
+                if (_fallbackTextBox != null) _fallbackTextBox.ReadOnly = value;
+            }
+        }
+
+        private void RefreshEditor()
+        {
+            uxTextBoxValue?.Refresh();
+            _fallbackTextBox?.Refresh();
         }
 
         private void AutoDetectSecretKind()
@@ -319,7 +335,10 @@ namespace Microsoft.Vault.Explorer
 
         private void ToggleCertificateMode(bool enable)
         {
-            uxTextBoxValue.ReadOnly = enable;
+            if (uxTextBoxValue != null)
+                uxTextBoxValue.ReadOnly = enable;
+            if (_fallbackTextBox != null)
+                _fallbackTextBox.ReadOnly = enable;
             uxLinkLabelViewCertificate.Visible = enable;
         }
 
@@ -328,10 +347,14 @@ namespace Microsoft.Vault.Explorer
             _certificateObj = cvo;
             if (_certificateObj != null)
             {
-                uxTextBoxValue.ReadOnly = false;
+                if (uxTextBoxValue != null)
+                    uxTextBoxValue.ReadOnly = false;
+                if (_fallbackTextBox != null)
+                    _fallbackTextBox.ReadOnly = false;
                 _certificateObj.FillTagsAndExpiration(PropertyObject);
                 SecretValueText = _certificateObj.ToValue(PropertyObject.SecretKind.CertificateFormat);
-                uxTextBoxValue.Refresh();
+                uxTextBoxValue?.Refresh();
+                _fallbackTextBox?.Refresh();
             }
             ToggleCertificateMode(_certificateObj != null);
         }
@@ -417,23 +440,23 @@ namespace Microsoft.Vault.Explorer
 
         private void uxMenuItemNewPassword_Click(object sender, EventArgs e)
         {
-            if (uxTextBoxValue.ReadOnly) return;
+            if (IsEditorReadOnly) return;
             SecretValueText = Utils.NewSecurePassword();
-            uxTextBoxValue.Refresh();
+            RefreshEditor();
         }
 
         private void uxMenuItemNewGuid_Click(object sender, EventArgs e)
         {
-            if (uxTextBoxValue.ReadOnly) return;
+            if (IsEditorReadOnly) return;
             SecretValueText = Guid.NewGuid().ToString("D");
-            uxTextBoxValue.Refresh();
+            RefreshEditor();
         }
 
         private void uxMenuItemNewApiKey_Click(object sender, EventArgs e)
         {
-            if (uxTextBoxValue.ReadOnly) return;
+            if (IsEditorReadOnly) return;
             SecretValueText = Utils.NewApiKey();
-            uxTextBoxValue.Refresh();
+            RefreshEditor();
         }
 
         private void uxSplitContainer_Panel1_SizeChanged(object sender, EventArgs e)
