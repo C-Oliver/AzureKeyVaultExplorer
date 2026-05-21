@@ -13,10 +13,11 @@ env:
   DOTNET_VERSION: '10.0.x'
   SOLUTION: 'AzureKeyVaultExplorer.sln'
   CONFIGURATION: 'Release'
+  FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: true
 
 jobs:
   build:
-    runs-on: windows-latest
+    runs-on: windows-2025
     
     steps:
     - name: Checkout
@@ -74,7 +75,7 @@ jobs:
         path: CoverageReport/SummaryGithub.md
 
   publish:
-    runs-on: windows-latest
+    runs-on: windows-2025
     needs: build
     if: github.ref == 'refs/heads/main' || github.ref == 'refs/heads/master'
 

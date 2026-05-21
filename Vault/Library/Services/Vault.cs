@@ -194,7 +194,7 @@ namespace Microsoft.Vault.Library
                 vaultsConfigFile = Path.Combine(AppDomain.CurrentDomain.BaseDirectory, Consts.VaultsJsonConfig);
                 if (!File.Exists(vaultsConfigFile))
                 {
-                    vaultsConfigFile = Path.Combine(Path.GetDirectoryName(Assembly.GetExecutingAssembly().Location)!, Consts.VaultsJsonConfig);
+                    vaultsConfigFile = Path.Combine(AppContext.BaseDirectory, Consts.VaultsJsonConfig);
                 }
             }
             return JsonConvert.DeserializeObject<VaultsConfig>(File.ReadAllText(vaultsConfigFile), settings)!;
