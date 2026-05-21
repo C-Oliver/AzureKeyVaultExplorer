@@ -216,14 +216,26 @@ namespace Microsoft.Vault.Explorer
 
         public static void ClearCliboard(TimeSpan interval, string md5)
         {
-            ProcessStartInfo sInfo = new ProcessStartInfo(Path.Combine(Application.StartupPath, "ClearClipboard.exe"), $"{interval} {md5}")
+            try
             {
-                CreateNoWindow = true,
-                WindowStyle = ProcessWindowStyle.Hidden,
-                UseShellExecute = false,
-                LoadUserProfile = false
-            };
-            Process.Start(sInfo);
+                var exePath = Path.Combine(Application.StartupPath, "ClearClipboard.exe");
+                if (!File.Exists(exePath)) return;
+
+                var sInfo = new ProcessStartInfo(exePath)
+                {
+                    CreateNoWindow = true,
+                    WindowStyle = ProcessWindowStyle.Hidden,
+                    UseShellExecute = false,
+                    LoadUserProfile = false
+                };
+                sInfo.ArgumentList.Add(interval.ToString());
+                sInfo.ArgumentList.Add(md5);
+                Process.Start(sInfo);
+            }
+            catch (Exception)
+            {
+                // Clipboard cleanup is best-effort — don't crash the app
+            }
         }
 
         public static void LaunchPowerShell(string vaultsJsonFile, string firstVaultName, string secondVaultName)

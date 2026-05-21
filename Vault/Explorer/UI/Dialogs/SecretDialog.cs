@@ -1,4 +1,4 @@
-﻿// Copyright (c) Microsoft Corporation. All rights reserved. 
+// Copyright (c) Microsoft Corporation. All rights reserved. 
 // Licensed under the MIT License. See License.txt in the project root for license information. 
 using ScintillaNET;
 using Newtonsoft.Json;
@@ -115,10 +115,10 @@ namespace Microsoft.Vault.Explorer
                     KeyVaultSecret s = kvsf.Deserialize();
                     uxPropertyGridSecret.SelectedObject = PropertyObject = new PropertyObjectSecret(s, SecretObject_PropertyChanged);
                     uxTextBoxName.Text = s?.Name;
-                    uxTextBoxValue.Text = s.Value;
+                    SecretValueText = s.Value;
                     return;
                 default:
-                    uxTextBoxValue.Text = File.ReadAllText(fi.FullName);
+                    SecretValueText = File.ReadAllText(fi.FullName);
                     return;
             }
             // Certificate flow
@@ -197,15 +197,15 @@ namespace Microsoft.Vault.Explorer
             PropertyObject = new PropertyObjectSecret(s, SecretObject_PropertyChanged);
             uxPropertyGridSecret.SelectedObject = PropertyObject;
             uxTextBoxName.Text = PropertyObject.Name;
-            uxTextBoxValue.Text = PropertyObject.Value;
+            SecretValueText = PropertyObject.Value;
 
             // Handle Scintilla framework bug where text is not updated.
-            if(uxTextBoxValue.Text != PropertyObject.Value)
+            if(SecretValueText != PropertyObject.Value)
             {
                 // Remove and create new textbox with value
                 uxSplitContainer.Panel1.Controls.Remove(uxTextBoxValue);
                 SetUpTextBoxValue();
-                uxTextBoxValue.Text = PropertyObject.Value;
+                SecretValueText = PropertyObject.Value;
             }
 
             ToggleCertificateMode(PropertyObject.ContentType.IsCertificate());
@@ -214,16 +214,53 @@ namespace Microsoft.Vault.Explorer
 
         private void SetUpTextBoxValue()
         {
-            uxTextBoxValue = new Scintilla();
-            uxSplitContainer.Panel1.Controls.Add(uxTextBoxValue);
+            try
+            {
+                var scintilla = new Scintilla();
+                // Force load the native DLL early to detect architecture mismatch
+                scintilla.CreateControl();
+                uxTextBoxValue = scintilla;
+                uxSplitContainer.Panel1.Controls.Add(uxTextBoxValue);
+                uxTextBoxValue.Dock = System.Windows.Forms.DockStyle.Fill;
+                uxTextBoxValue.TextChanged += uxTextBoxValue_TextChanged;
+                uxTextBoxValue.WrapMode = WrapMode.None;
+                uxTextBoxValue.IndentationGuides = IndentView.LookBoth;
+            }
+            catch (Exception)
+            {
+                // Scintilla native DLL not available for this architecture (e.g. ARM64)
+                // Fall back to a plain TextBox
+                var textBox = new System.Windows.Forms.RichTextBox
+                {
+                    Dock = System.Windows.Forms.DockStyle.Fill,
+                    Font = new Font("Cascadia Code", 10F, FontStyle.Regular, GraphicsUnit.Point),
+                    Multiline = true,
+                    ScrollBars = System.Windows.Forms.RichTextBoxScrollBars.Both,
+                    WordWrap = false,
+                    AcceptsTab = true
+                };
+                _fallbackTextBox = textBox;
+                textBox.TextChanged += uxTextBoxValue_TextChanged;
+                uxSplitContainer.Panel1.Controls.Add(textBox);
+            }
+        }
 
-            // basic config
-            uxTextBoxValue.Dock = System.Windows.Forms.DockStyle.Fill;
-            uxTextBoxValue.TextChanged += uxTextBoxValue_TextChanged;
+        // Fallback for ARM64 where Scintilla native DLL isn't available
+        private System.Windows.Forms.RichTextBox? _fallbackTextBox;
 
-            //initial view config
-            uxTextBoxValue.WrapMode = WrapMode.None;
-            uxTextBoxValue.IndentationGuides = IndentView.LookBoth;
+        /// <summary>
+        /// Gets or sets the secret value text, abstracting over Scintilla or fallback RichTextBox.
+        /// </summary>
+        private string SecretValueText
+        {
+            get => _fallbackTextBox?.Text ?? uxTextBoxValue?.Text ?? "";
+            set
+            {
+                if (_fallbackTextBox != null)
+                    _fallbackTextBox.Text = value;
+                else if (uxTextBoxValue != null)
+                    SecretValueText = value;
+            }
         }
 
         private void AutoDetectSecretKind()
@@ -264,7 +301,7 @@ namespace Microsoft.Vault.Explorer
             {
                 autoDetectSecretKind = TryGetDefaultSecretKind();
             }
-            _certificateObj = PropertyObject.ContentType.IsCertificate() ? CertificateValueObject.FromValue(uxTextBoxValue.Text) : null;
+            _certificateObj = PropertyObject.ContentType.IsCertificate() ? CertificateValueObject.FromValue(SecretValueText) : null;
             autoDetectSecretKind?.PerformClick();
         }
 
@@ -293,7 +330,7 @@ namespace Microsoft.Vault.Explorer
             {
                 uxTextBoxValue.ReadOnly = false;
                 _certificateObj.FillTagsAndExpiration(PropertyObject);
-                uxTextBoxValue.Text = _certificateObj.ToValue(PropertyObject.SecretKind.CertificateFormat);
+                SecretValueText = _certificateObj.ToValue(PropertyObject.SecretKind.CertificateFormat);
                 uxTextBoxValue.Refresh();
             }
             ToggleCertificateMode(_certificateObj != null);
@@ -302,7 +339,7 @@ namespace Microsoft.Vault.Explorer
         private void uxTextBoxValue_TextChanged(object sender, EventArgs e)
         {
             _changed = true;
-            PropertyObject.Value = uxTextBoxValue.Text;
+            PropertyObject.Value = SecretValueText;
             uxTimerValueTypingCompleted.Stop(); // Wait for user to finish the typing in a text box
             uxTimerValueTypingCompleted.Start();
         }
@@ -356,7 +393,7 @@ namespace Microsoft.Vault.Explorer
             if (_mode == ItemDialogBaseMode.New)
             {
                 PropertyObject.PopulateExpiration();
-                uxTextBoxValue.Text = sk.ValueTemplate;
+                SecretValueText = sk.ValueTemplate;
             }
             sk.Checked = true;
             uxLinkLabelSecretKind.Text = sk.ToString();
@@ -381,21 +418,21 @@ namespace Microsoft.Vault.Explorer
         private void uxMenuItemNewPassword_Click(object sender, EventArgs e)
         {
             if (uxTextBoxValue.ReadOnly) return;
-            uxTextBoxValue.Text = Utils.NewSecurePassword();
+            SecretValueText = Utils.NewSecurePassword();
             uxTextBoxValue.Refresh();
         }
 
         private void uxMenuItemNewGuid_Click(object sender, EventArgs e)
         {
             if (uxTextBoxValue.ReadOnly) return;
-            uxTextBoxValue.Text = Guid.NewGuid().ToString("D");
+            SecretValueText = Guid.NewGuid().ToString("D");
             uxTextBoxValue.Refresh();
         }
 
         private void uxMenuItemNewApiKey_Click(object sender, EventArgs e)
         {
             if (uxTextBoxValue.ReadOnly) return;
-            uxTextBoxValue.Text = Utils.NewApiKey();
+            SecretValueText = Utils.NewApiKey();
             uxTextBoxValue.Refresh();
         }
 
