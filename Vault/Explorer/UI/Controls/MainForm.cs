@@ -568,6 +568,7 @@ namespace Microsoft.Vault.Explorer
                 {
                     po = await item.GetAsync(op.CancellationToken);
                 });
+                if (po == null) return; // Operation failed or was cancelled
                 uxSaveFileDialog.FileName = po.GetFileName();
                 uxSaveFileDialog.DefaultExt = po.GetContentType().ToExtension();
                 uxSaveFileDialog.FilterIndex = po.GetContentType().ToFilterIndex();

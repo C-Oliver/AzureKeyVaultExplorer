@@ -31,25 +31,11 @@ namespace Microsoft.Vault.Explorer
             Font = new Font("Segoe UI", 9.75F);
             _tags = new Dictionary<string, TagMenuItem>();
 
-            OwnerDraw = true;
-            DrawItem += ListViewSecrets_DrawItem;
-            DrawSubItem += ListViewSecrets_DrawSubItem;
-            DrawColumnHeader += ListViewSecrets_DrawColumnHeader;
-        }
-
-        private void ListViewSecrets_DrawColumnHeader(object? sender, DrawListViewColumnHeaderEventArgs e)
-        {
-            e.DrawDefault = true;
-        }
-
-        private void ListViewSecrets_DrawSubItem(object? sender, DrawListViewSubItemEventArgs e)
-        {
-            e.DrawDefault = true;
-        }
-
-        private void ListViewSecrets_DrawItem(object? sender, DrawListViewItemEventArgs e)
-        {
-            e.DrawDefault = true;
+            HandleCreated += (s, e) =>
+            {
+                if (ThemeHelper.IsDarkMode)
+                    ThemeHelper.ApplyDarkModeToHandle(Handle);
+            };
         }
 
         public ListViewItemBase FirstSelectedItem => SelectedItems.Count > 0 ? SelectedItems[0] as ListViewItemBase : null;

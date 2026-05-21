@@ -1,17 +1,26 @@
 // Copyright (c) Microsoft Corporation. All rights reserved. 
 // Licensed under the MIT License. See License.txt in the project root for license information. 
 
+using System;
 using System.Drawing;
+using System.Runtime.InteropServices;
 using System.Windows.Forms;
 
 namespace Microsoft.Vault.Explorer
 {
     /// <summary>
     /// Provides theme-aware colors following Microsoft Fluent design guidelines.
-    /// Adapts colors based on whether the system is using dark or light mode.
+    /// Uses Windows dark mode APIs to fix ListView group headers and other OS-rendered elements.
     /// </summary>
     internal static class ThemeHelper
     {
+        [DllImport("uxtheme.dll", CharSet = CharSet.Unicode)]
+        private static extern int SetWindowTheme(IntPtr hwnd, string pszSubAppName, string? pszSubIdList);
+
+        [DllImport("dwmapi.dll")]
+        private static extern int DwmSetWindowAttribute(IntPtr hwnd, int attr, ref int attrValue, int attrSize);
+
+        private const int DWMWA_USE_IMMERSIVE_DARK_MODE = 20;
         /// <summary>
         /// Determines if the current system theme is dark based on the window background luminance.
         /// </summary>
@@ -61,11 +70,16 @@ namespace Microsoft.Vault.Explorer
             : Color.FromArgb(157, 93, 0);     // Dark orange for light
 
         /// <summary>
-        /// Applies theme-aware colors to all LinkLabels and PropertyGrids in a control tree.
+        /// Applies theme-aware colors to all controls in a form's control tree.
         /// </summary>
         public static void ApplyTo(Control control)
         {
-            foreach (Control child in control.Controls)
+            ApplyToRecursive(control);
+        }
+
+        private static void ApplyToRecursive(Control parent)
+        {
+            foreach (Control child in parent.Controls)
             {
                 if (child is LinkLabel link)
                 {
@@ -79,27 +93,57 @@ namespace Microsoft.Vault.Explorer
                     ApplyToPropertyGrid(grid);
                 }
 
-                // Recurse into containers (ToolStripContainer panels, SplitContainers, etc.)
-                if (child.HasChildren)
+                // Apply dark mode Explorer theme to ListViews — fixes group header colors
+                if (child is ListView lv && lv.IsHandleCreated && IsDarkMode)
                 {
-                    ApplyTo(child);
+                    SetWindowTheme(lv.Handle, "DarkMode_Explorer", null);
                 }
 
-                // ToolStripContainer has special panels
+                // Apply dark mode Explorer theme to TreeViews (used inside PropertyGrid)
+                if (child is TreeView tv && tv.IsHandleCreated && IsDarkMode)
+                {
+                    SetWindowTheme(tv.Handle, "DarkMode_Explorer", null);
+                }
+
+                // ToolStripContainer has panels accessible only via properties
                 if (child is ToolStripContainer tsc)
                 {
-                    ApplyTo(tsc.ContentPanel);
-                    ApplyTo(tsc.TopToolStripPanel);
-                    ApplyTo(tsc.BottomToolStripPanel);
+                    ApplyToRecursive(tsc.ContentPanel);
+                    ApplyToRecursive(tsc.TopToolStripPanel);
+                    ApplyToRecursive(tsc.BottomToolStripPanel);
+                    ApplyToRecursive(tsc.LeftToolStripPanel);
+                    ApplyToRecursive(tsc.RightToolStripPanel);
                 }
 
                 // SplitContainer panels
                 if (child is SplitContainer sc)
                 {
-                    ApplyTo(sc.Panel1);
-                    ApplyTo(sc.Panel2);
+                    ApplyToRecursive(sc.Panel1);
+                    ApplyToRecursive(sc.Panel2);
+                }
+
+                // TabControl pages
+                if (child is TabControl tc)
+                {
+                    foreach (TabPage page in tc.TabPages)
+                        ApplyToRecursive(page);
+                }
+
+                // Recurse into all children
+                if (child.HasChildren)
+                {
+                    ApplyToRecursive(child);
                 }
             }
+        }
+
+        /// <summary>
+        /// Applies dark mode Explorer theme to a native window handle.
+        /// Fixes ListView group headers, scrollbars, and other OS-rendered elements.
+        /// </summary>
+        public static void ApplyDarkModeToHandle(IntPtr handle)
+        {
+            SetWindowTheme(handle, "DarkMode_Explorer", null);
         }
 
         /// <summary>

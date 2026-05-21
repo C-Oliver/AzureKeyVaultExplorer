@@ -77,7 +77,7 @@ namespace Microsoft.Vault.Explorer
 
         public string Md5 => Microsoft.Vault.Library.Utils.GetHash(Tags);
 
-        public string Link => $"https://aka.ms/ve?{VaultHttpsUri.VaultLink}";
+        public string Link => $"{AppConfig.Current.Application.ShareLinkBaseUrl}?{VaultHttpsUri.VaultLink}";
 
         public bool AboutToExpire => DateTime.UtcNow + Settings.Default.AboutToExpireWarningPeriod <= (Expires ?? DateTime.MaxValue);
 

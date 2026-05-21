@@ -199,14 +199,34 @@ namespace Microsoft.Vault.Library
                 : new Uri($"https://{vaultName}.{Consts.VaultDnsSuffix}/");
         }
 
+        private Azure.Core.TokenCredential GetCredential(VaultAccessTypeEnum accessType, string vaultName)
+        {
+            // Use configured credential from VaultsConfig if available
+            if (VaultsConfig.ContainsKey(vaultName))
+            {
+                var accessTypes = VaultsConfig[vaultName];
+                var accessList = accessType == VaultAccessTypeEnum.ReadOnly ? accessTypes.ReadOnly : accessTypes.ReadWrite;
+                if (accessList != null && accessList.Length > 0)
+                {
+                    // Sort by order (cert=0, secret=1, interactive=2) and try the first one
+                    var access = accessList.OrderBy(a => a.Order).First();
+                    var credential = access.AcquireToken(null);
+                    if (credential != null)
+                        return credential;
+                }
+            }
+            // Fall back to interactive browser credential (matches original behavior)
+            return new InteractiveBrowserCredential();
+        }
+
         private SecretClient CreateKeyVaultClientEx(VaultAccessTypeEnum accessType, string vaultName)
         {
-            return new SecretClient(BuildVaultUri(vaultName), new DefaultAzureCredential());
+            return new SecretClient(BuildVaultUri(vaultName), GetCredential(accessType, vaultName));
         }
 
         private CertificateClient CreateCertificateClient(string vaultName)
         {
-            return new CertificateClient(BuildVaultUri(vaultName), new DefaultAzureCredential());
+            return new CertificateClient(BuildVaultUri(vaultName), GetCredential(VaultAccessTypeEnum.ReadOnly, vaultName));
         }
 
         #endregion
